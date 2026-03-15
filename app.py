@@ -17,10 +17,10 @@ model = load_model()
 
 # Initialize SHAP explainer (also cached for performance)
 @st.cache_resource
-def load_explainer(model):
+def load_explainer():
     return shap.TreeExplainer(model)
 
-explainer = load_explainer(model)
+explainer = load_explainer()
 
 st.title("AI CKD Outcome Prediction System")
 
