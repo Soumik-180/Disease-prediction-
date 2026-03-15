@@ -24,14 +24,18 @@ explainer = load_explainer()
 
 st.title("AI CKD Outcome Prediction System")
 
-st.write("Enter patient biomarker values to predict CKD outcome.")
-
 st.markdown("""
-### AI Biomarker-Based CKD Outcome Prediction
 
 This system uses a **Random Forest machine learning model** trained on
 clinical biomarker data to predict CKD progression risk.
 
+            Model Transparency
+
+• Algorithm: Random Forest
+• Training samples: ~10,000 patients
+• Features: 18 clinical biomarkers
+• Explainability: SHAP feature attribution
+            
 Possible outcomes:
 - Stable CKD
 - Death Risk
