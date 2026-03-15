@@ -8,11 +8,19 @@ import shap
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
-# Load trained model
-model = joblib.load("models/random_forest_best_model.pkl")
+# Load trained model (cached to avoid reloading on every interaction)
+@st.cache_resource
+def load_model():
+    return joblib.load("models/random_forest_best_model.pkl")
 
-# Initialize SHAP explainer
-explainer = shap.TreeExplainer(model)
+model = load_model()
+
+# Initialize SHAP explainer (also cached for performance)
+@st.cache_resource
+def load_explainer(model):
+    return shap.TreeExplainer(model)
+
+explainer = load_explainer(model)
 
 st.title("AI CKD Outcome Prediction System")
 
