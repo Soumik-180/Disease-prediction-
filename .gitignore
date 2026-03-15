@@ -1,4 +1,5 @@
 venv/
 __pycache__/
 *.pkl
+!models/random_forest_best_model.pkl
 .DS_Store

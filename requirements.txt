@@ -6,3 +6,4 @@ seaborn
 joblib
 shap
 streamlit
+plotly
