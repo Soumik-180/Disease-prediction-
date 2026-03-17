@@ -1,11 +1,18 @@
+import pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def evaluate_and_plot(model, X_test, y_test, figures_dir='figures'):
+def evaluate_and_plot(model, X_test: pd.DataFrame, y_test: pd.Series, figures_dir: str = 'figures') -> None:
     """
-    Evaluates the model and saves the confusion matrix heatmap.
+    Evaluates the model on the test set and saves a confusion matrix heatmap.
+
+    Args:
+        model: Trained model (or pipeline) with a predict method.
+        X_test: Test feature DataFrame.
+        y_test: Test target Series.
+        figures_dir: Directory to save the confusion matrix figure.
     """
     # 预测 (Prediction)
     y_pred = model.predict(X_test)

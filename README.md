@@ -84,8 +84,8 @@ Target variable:
 Clone the repository:
 
 ```bash
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/Soumik-180/Disease-prediction-.git
+cd Disease-prediction-
 ```
 
 Create virtual environment:
@@ -121,11 +121,15 @@ streamlit run app.py
 
 ## Deployment
 
-The application is deployed using:
+The application is deployed using GitHub and Streamlit Community Cloud.
 
-- GitHub
-- Streamlit Cloud
-- Try the prototype: https://disease-outcome-prediction.streamlit.app
+**Try the prototype:** [Live App Link](https://disease-outcome-prediction.streamlit.app) *(Update this link to your actual deployment)*
+
+### How to deploy your own instance
+
+1. **Push your code to GitHub:** Ensure your repository includes `app.py`, `requirements.txt`, and the trained `models/` folder. (Note: You may need Git LFS for large `.pkl` files).
+2. **Go to Streamlit Community Cloud:** Log in at [share.streamlit.io](https://share.streamlit.io/) with your GitHub account.
+3. **Deploy the app:** Click "New app", select your repository, branch, and set the Main file path to `app.py`. Click "Deploy".
 
 ---
 

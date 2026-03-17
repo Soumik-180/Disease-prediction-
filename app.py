@@ -5,20 +5,32 @@ import joblib
 
 # SHAP and plotting for explainability
 import shap
+import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
 # Load trained model (cached to avoid reloading on every interaction)
 @st.cache_resource
 def load_model():
-    return joblib.load("models/random_forest_best_model.pkl")
+    try:
+        return joblib.load("models/random_forest_best_model.pkl")
+    except FileNotFoundError:
+        st.error("❌ Model file not found. Please run `python main.py` to train the model first.")
+        st.stop()
+    except Exception as e:
+        st.error(f"❌ Failed to load model: {e}")
+        st.stop()
 
 model = load_model()
 
 # Initialize SHAP explainer (also cached for performance)
 @st.cache_resource
 def load_explainer():
-    return shap.TreeExplainer(model)
+    try:
+        return shap.TreeExplainer(model)
+    except Exception as e:
+        st.error(f"❌ Failed to initialize SHAP explainer: {e}")
+        st.stop()
 
 explainer = load_explainer()
 
@@ -91,186 +103,205 @@ with left_col:
     predict_button = st.button("Predict CKD Outcome")
 
 if predict_button:
+    # Input validation
+    if diastolic >= systolic:
+        st.warning("⚠️ Diastolic BP is greater than or equal to Systolic BP. Please verify your input.")
+    try:
 
-    with left_col:
-        st.subheader("Patient Summary")
+        with left_col:
+            st.subheader("Patient Summary")
 
-        summary_df = pd.DataFrame({
-            "Input": [
-                "Age", "Sex", "BMI", "eGFR", "Creatinine",
-                "Hemoglobin", "Potassium", "Calcium",
-                "Systolic BP", "Diastolic BP", "HbA1c"
-            ],
-            "Value": [
-                str(age),
-                "Male" if sex == 1 else "Female",
-                str(bmi),
-                str(egfr),
-                str(creatinine),
-                str(hemoglobin),
-                str(potassium),
-                str(calcium),
-                str(systolic),
-                str(diastolic),
-                str(hba1c)
-            ]
-        })
-
-        st.dataframe(summary_df, width='stretch', hide_index=True)
-
-    patient_data = pd.DataFrame([{
-        "age_years": age,
-        "sex": sex,
-        "bmi": bmi,
-        "hypertension": hypertension,
-        "diabetes": diabetes,
-        "hiv_positive": hiv,
-        "glomerulonephritis": glomerulonephritis,
-        "egfr": egfr,
-        "serum_creatinine_mgdl": creatinine,
-        "uacr_mg_g": uacr,
-        "hemoglobin_gdl": hemoglobin,
-        "potassium_meql": potassium,
-        "phosphate_mgdl": phosphate,
-        "calcium_mgdl": calcium,
-        "bun_mgdl": bun,
-        "systolic_bp": systolic,
-        "diastolic_bp": diastolic,
-        "hba1c_pct": hba1c
-    }])
-
-    prediction = model.predict(patient_data)
-    probs = model.predict_proba(patient_data)[0]
-
-    outcome_map = {
-        0: "Stable CKD",
-        1: "Death Risk",
-        2: "ESRD Risk"
-    }
-
-    result = outcome_map[prediction[0]]
-
-    with right_col:
-        st.subheader("Prediction Result")
-        st.success(result)
-
-        st.subheader("Prediction Probabilities")
-
-        # Align probabilities with the model's class order
-        class_labels = [outcome_map[c] for c in model.classes_]
-
-        prob_df = pd.DataFrame({
-            "Outcome": class_labels,
-            "Probability": probs
-        })
-
-
-        st.bar_chart(prob_df.set_index("Outcome"))
-
-        # CKD Risk Gauge
-        st.subheader("CKD Risk Level")
-
-        # Use the highest serious outcome probability (Death or ESRD)
-        risk_score = max(probs[1], probs[2])
-
-        # Convert to percentage score
-        risk_percent = int(risk_score * 100)
-
-        # Display numeric AI risk score
-        # st.metric("AI Risk Score", f"{risk_percent}/100")
-
-        # Visual gauge for risk score
-        gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=risk_percent,
-            number={'font': {'size': 48}},
-            gauge={
-                'axis': {'range': [0, 100], 'tickwidth': 1},
-                'bar': {'color': "#ff4b4b", 'thickness': 0.18},
-                'bgcolor': "rgba(0,0,0,0)",
-                'steps': [
-                    {'range': [0, 30], 'color': "#2ecc71"},
-                    {'range': [30, 60], 'color': "#f1c40f"},
-                    {'range': [60, 100], 'color': "#e74c3c"}
+            summary_df = pd.DataFrame({
+                "Input": [
+                    "Age", "Sex", "BMI", "Hypertension", "Diabetes",
+                    "HIV", "Glomerulonephritis", "eGFR", "Creatinine",
+                    "UACR", "Hemoglobin", "Potassium", "Phosphate",
+                    "Calcium", "BUN", "Systolic BP", "Diastolic BP", "HbA1c"
+                ],
+                "Value": [
+                    str(age),
+                    "Male" if sex == 1 else "Female",
+                    str(bmi),
+                    "Yes" if hypertension == 1 else "No",
+                    "Yes" if diabetes == 1 else "No",
+                    "Yes" if hiv == 1 else "No",
+                    "Yes" if glomerulonephritis == 1 else "No",
+                    str(egfr),
+                    str(creatinine),
+                    str(uacr),
+                    str(hemoglobin),
+                    str(potassium),
+                    str(phosphate),
+                    str(calcium),
+                    str(bun),
+                    str(systolic),
+                    str(diastolic),
+                    str(hba1c)
                 ]
-            }
-        ))
-        gauge.update_layout(height=260, margin=dict(l=10, r=10, t=0, b=0))
+            })
 
-        st.plotly_chart(gauge, width='stretch', config={"displayModeBar": False})
+            st.dataframe(summary_df, width='stretch', hide_index=True)
 
-        # Risk interpretation
-        if risk_score < 0.3:
-            st.success("🟢 Low CKD Progression / Mortality Risk")
-        elif risk_score < 0.6:
-            st.warning("🟡 Moderate CKD Progression / Mortality Risk")
-        else:
-            st.error("🔴 High CKD Progression / Mortality Risk")
+        patient_data = pd.DataFrame([{
+            "age_years": age,
+            "sex": sex,
+            "bmi": bmi,
+            "hypertension": hypertension,
+            "diabetes": diabetes,
+            "hiv_positive": hiv,
+            "glomerulonephritis": glomerulonephritis,
+            "egfr": egfr,
+            "serum_creatinine_mgdl": creatinine,
+            "uacr_mg_g": uacr,
+            "hemoglobin_gdl": hemoglobin,
+            "potassium_meql": potassium,
+            "phosphate_mgdl": phosphate,
+            "calcium_mgdl": calcium,
+            "bun_mgdl": bun,
+            "systolic_bp": systolic,
+            "diastolic_bp": diastolic,
+            "hba1c_pct": hba1c
+        }])
 
-        st.subheader("Clinical Explanation")
+        prediction = model.predict(patient_data)
+        probs = model.predict_proba(patient_data)[0]
 
-        # Compute SHAP values for this patient
-        shap_values = explainer.shap_values(patient_data)
-        import numpy as np
-        predicted_class = prediction[0]
+        outcome_map = {
+            0: "Stable CKD",
+            1: "Death Risk",
+            2: "ESRD Risk"
+        }
 
-        # Extract SHAP values for the predicted class and the single patient row
-        if isinstance(shap_values, list):
-            # shape: [n_classes][n_samples][n_features]
-            shap_values_class = shap_values[predicted_class][0]
-        else:
-            # shape: [n_samples][n_features]
-            shap_values_class = shap_values[0]
+        result = outcome_map[prediction[0]]
 
-        # Ensure numpy 1D array
-        shap_values_class = np.array(shap_values_class).reshape(-1)
-
-        # Force SHAP length to match number of features
-        n_features = len(patient_data.columns)
-        if len(shap_values_class) != n_features:
-            shap_values_class = shap_values_class[:n_features]
-
-        # Create SHAP importance dataframe safely
-        shap_df = pd.DataFrame({
-            "Feature": list(patient_data.columns),
-            "SHAP Value": list(shap_values_class)
-        })
-
-        shap_df = shap_df.sort_values(by="SHAP Value", key=abs, ascending=False).head(10)
-
-
-        fig, ax = plt.subplots(facecolor='#0e1117')
-        ax.set_facecolor('#0e1117')
-
-        # Color bars: red = increases risk, green = protective
-        colors = ["#e74c3c" if v > 0 else "#2ecc71" for v in shap_df["SHAP Value"]]
-
-        ax.barh(shap_df["Feature"], shap_df["SHAP Value"], color=colors)
-        ax.set_xlabel("Impact on Prediction")
-        ax.set_title("Top Biomarkers Influencing This Prediction")
-        ax.invert_yaxis()
-        ax.tick_params(colors='white')
-        ax.xaxis.label.set_color('white')
-        ax.title.set_color('white')
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-
-        st.pyplot(fig)
-
-        # --- Clinical Explanation Panel ---
-        st.markdown("### Key Factors Driving This Prediction")
-
-        top_factors = shap_df.head(5)
-
-        explanation_lines = []
-        for _, row in top_factors.iterrows():
-            feature = row["Feature"].replace("_", " ").title()
-            impact = row["SHAP Value"]
-
-            if impact > 0:
-                explanation_lines.append(f"• **{feature}** increased the predicted risk")
+        with right_col:
+            st.subheader("Prediction Result")
+            if prediction[0] == 0:
+                st.success(f"✅ {result}")
+            elif prediction[0] == 1:
+                st.error(f"🔴 {result}")
             else:
-                explanation_lines.append(f"• **{feature}** reduced the predicted risk")
+                st.warning(f"🟡 {result}")
 
-        for line in explanation_lines:
-            st.markdown(line)
+            st.subheader("Prediction Probabilities")
+
+            # Align probabilities with the model's class order
+            class_labels = [outcome_map[c] for c in model.classes_]
+
+            prob_df = pd.DataFrame({
+                "Outcome": class_labels,
+                "Probability": probs
+            })
+
+            st.bar_chart(prob_df.set_index("Outcome"))
+
+            # CKD Risk Gauge
+            st.subheader("CKD Risk Level")
+
+            # Use the highest serious outcome probability (Death or ESRD)
+            classes = list(model.classes_)
+            death_prob = probs[classes.index(1)]
+            esrd_prob = probs[classes.index(2)]
+            risk_score = max(death_prob, esrd_prob)
+
+            # Convert to percentage score
+            risk_percent = int(risk_score * 100)
+
+            # Visual gauge for risk score
+            gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=risk_percent,
+                number={'font': {'size': 48}},
+                gauge={
+                    'axis': {'range': [0, 100], 'tickwidth': 1},
+                    'bar': {'color': "#ff4b4b", 'thickness': 0.18},
+                    'bgcolor': "rgba(0,0,0,0)",
+                    'steps': [
+                        {'range': [0, 30], 'color': "#2ecc71"},
+                        {'range': [30, 60], 'color': "#f1c40f"},
+                        {'range': [60, 100], 'color': "#e74c3c"}
+                    ]
+                }
+            ))
+            gauge.update_layout(height=260, margin=dict(l=10, r=10, t=0, b=0))
+
+            st.plotly_chart(gauge, width='stretch', config={"displayModeBar": False})
+
+            # Risk interpretation
+            if risk_score < 0.3:
+                st.success("🟢 Low CKD Progression / Mortality Risk")
+            elif risk_score < 0.6:
+                st.warning("🟡 Moderate CKD Progression / Mortality Risk")
+            else:
+                st.error("🔴 High CKD Progression / Mortality Risk")
+
+            st.subheader("Clinical Explanation")
+
+            # Compute SHAP values for this patient
+            shap_values = explainer.shap_values(patient_data)
+
+            predicted_class = prediction[0]
+
+            # Extract SHAP values for the predicted class and the single patient row
+            if isinstance(shap_values, list):
+                # shape: [n_classes][n_samples][n_features]
+                shap_values_class = shap_values[predicted_class][0]
+            else:
+                # shape: [n_samples][n_features]
+                shap_values_class = shap_values[0]
+
+            # Ensure numpy 1D array
+            shap_values_class = np.array(shap_values_class).reshape(-1)
+
+            # Force SHAP length to match number of features
+            n_features = len(patient_data.columns)
+            if len(shap_values_class) != n_features:
+                shap_values_class = shap_values_class[:n_features]
+
+            # Create SHAP importance dataframe safely
+            shap_df = pd.DataFrame({
+                "Feature": list(patient_data.columns),
+                "SHAP Value": list(shap_values_class)
+            })
+
+            shap_df = shap_df.sort_values(by="SHAP Value", key=abs, ascending=False).head(10)
+
+            fig, ax = plt.subplots(facecolor='#0e1117')
+            ax.set_facecolor('#0e1117')
+
+            # Color bars: red = increases risk, green = protective
+            colors = ["#e74c3c" if v > 0 else "#2ecc71" for v in shap_df["SHAP Value"]]
+
+            ax.barh(shap_df["Feature"], shap_df["SHAP Value"], color=colors)
+            ax.set_xlabel("Impact on Prediction")
+            ax.set_title("Top Biomarkers Influencing This Prediction")
+            ax.invert_yaxis()
+            ax.tick_params(colors='white')
+            ax.xaxis.label.set_color('white')
+            ax.title.set_color('white')
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+
+            st.pyplot(fig)
+
+            # --- Clinical Explanation Panel ---
+            st.markdown("### Key Factors Driving This Prediction")
+
+            top_factors = shap_df.head(5)
+
+            explanation_lines = []
+            for _, row in top_factors.iterrows():
+                feature = row["Feature"].replace("_", " ").title()
+                impact = row["SHAP Value"]
+
+                if impact > 0:
+                    explanation_lines.append(f"• **{feature}** increased the predicted risk")
+                else:
+                    explanation_lines.append(f"• **{feature}** reduced the predicted risk")
+
+            for line in explanation_lines:
+                st.markdown(line)
+
+    except Exception as e:
+        st.error(f"❌ Prediction failed: {e}")
+        st.exception(e)

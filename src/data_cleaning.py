@@ -18,10 +18,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
+from config import RAW_DATA_PATH, CLEANED_DATA_PATH, GRAPH_DIR
+
 # Configuration
-INPUT_PATH = 'Data/Raw/ckd_community_screening.csv'
-OUTPUT_PATH = 'Data/Cleaned/ckd_cleaned_dataset_v3.csv'
-GRAPH_DIR = 'Graph'
+INPUT_PATH = RAW_DATA_PATH
+OUTPUT_PATH = CLEANED_DATA_PATH
 
 # Ensure output directory exists
 os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)

@@ -1,14 +1,21 @@
 import pandas as pd
 
-def balance_outcome_classes(X, y):
+def balance_outcome_classes(X: pd.DataFrame, y: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Solves class imbalance by merging 'Progression' (1) and 'Death' (2) 
-    into a single 'Death' class.
-    
+    Merges 'Progression' (1) and 'Death' (2) into a single 'Death' class
+    to address class imbalance.
+
     New Class Labels:
-    0 -> Stable CKD
-    1 -> Death
-    2 -> ESRD
+        0 -> Stable CKD
+        1 -> Death (merged from Progression + Death)
+        2 -> ESRD
+
+    Args:
+        X: Feature DataFrame.
+        y: Target Series with original outcome labels.
+
+    Returns:
+        Tuple of (X unchanged, y with merged class labels).
     """
     print("\n=== Step 2: Fixing Outcome Imbalance ===")
     
@@ -18,7 +25,7 @@ def balance_outcome_classes(X, y):
     # Merge classes only if the dataset still contains the original 4 labels
     unique_labels = set(y_balanced.unique())
 
-    if 3 in unique_labels or 2 in unique_labels and max(unique_labels) > 2:
+    if max(unique_labels) > 2:
         # Original dataset with labels 0,1,2,3
         y_balanced = y_balanced.map({
             0: 0,  # Stable CKD

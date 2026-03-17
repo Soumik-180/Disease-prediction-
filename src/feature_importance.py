@@ -3,9 +3,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def analyze_feature_importance(model, feature_names, results_dir='results', figures_dir='figures'):
+def analyze_feature_importance(model, feature_names, results_dir: str = 'results', figures_dir: str = 'figures') -> pd.DataFrame:
     """
-    Extracts, saves, and plots the top 10 biomarkers.
+    Extracts, saves, and plots the top 10 most important biomarkers.
+
+    Args:
+        model: Trained RandomForestClassifier with feature_importances_.
+        feature_names: List or Index of feature column names.
+        results_dir: Directory to save CSV results.
+        figures_dir: Directory to save the feature importance plot.
+
+    Returns:
+        DataFrame with all features ranked by importance.
     """
     # 1. Feature Importance
     importances = model.feature_importances_

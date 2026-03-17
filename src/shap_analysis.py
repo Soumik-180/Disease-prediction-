@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 def run_shap_analysis():
     print("\nRunning SHAP Explainability Analysis")
 
-    # Paths
-    model_path = "models/random_forest_best_model.pkl"
-    test_data_path = "Data/Split/X_test.csv"
-    figures_dir = "figures"
+    # Paths from centralized config
+    from config import MODEL_PATH, SPLIT_DIR, FIGURES_DIR
+    model_path = MODEL_PATH
+    test_data_path = f"{SPLIT_DIR}/X_test.csv"
+    figures_dir = FIGURES_DIR
 
     os.makedirs(figures_dir, exist_ok=True)
 

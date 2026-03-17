@@ -1,9 +1,15 @@
 import pandas as pd
 import os
 
-def load_dataset(file_path):
+def load_dataset(file_path: str) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Loads the CKD dataset and prints overview statistics.
+    Loads the CKD dataset, prints overview statistics, and returns features/target.
+
+    Args:
+        file_path: Path to the cleaned CSV dataset.
+
+    Returns:
+        Tuple of (X features DataFrame, y target Series).
     """
 
     if not os.path.exists(file_path):

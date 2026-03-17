@@ -18,10 +18,11 @@ Author: ML Engineering Pipeline
 import pandas as pd
 import os
 from sklearn.model_selection import train_test_split
+from config import CLEANED_DATA_PATH, SPLIT_DIR
 
 # Paths
-INPUT_PATH = "Data/Cleaned/ckd_cleaned_dataset_v3.csv"
-OUTPUT_DIR = "Data/Split"
+INPUT_PATH = CLEANED_DATA_PATH
+OUTPUT_DIR = SPLIT_DIR
 
 # Create split directory if it doesn't exist
 os.makedirs(OUTPUT_DIR, exist_ok=True)
