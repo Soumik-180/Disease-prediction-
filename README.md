@@ -131,7 +131,7 @@ streamlit run app.py
 
 The application is deployed using GitHub and Streamlit Community Cloud.
 
-**Try the prototype:** [Live App Link](https://disease-outcome-prediction.streamlit.app) *(Update this link to your actual deployment)*
+**Try the prototype:** [Live App Link](https://disease-outcome-prediction.streamlit.app)
 
 ### How to deploy your own instance
 
