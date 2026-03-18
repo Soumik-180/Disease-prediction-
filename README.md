@@ -28,8 +28,8 @@ The dataset consists of clinical biomarker features such as:
 
 - Age
 - Sex
-- BMI
-- Hypertension
+- BMI (removed in final pipeline)
+- Hypertension (removed in final pipeline)
 - Diabetes
 - eGFR
 - Serum Creatinine
@@ -39,14 +39,22 @@ The dataset consists of clinical biomarker features such as:
 - Phosphate
 - Calcium
 - BUN
-- Blood Pressure
+- Blood Pressure (Systolic)
 - HbA1c
+- Glomerulonephritis (removed in final pipeline)
+- Diastolic BP (removed in final pipeline)
+
+*Plus 4 engineered clinical features:*
+- BUN/Creatinine Ratio
+- Calcium-Phosphate Product
+- Renal Risk Score
+- Log(UACR)
 
 Target variable:
 
 - 0 → Stable CKD
-- 1 → Death Risk
-- 2 → ESRD
+- 1 → Death / Progression Risk
+- 2 → ESRD Risk
 
 ---
 
@@ -58,13 +66,13 @@ Target variable:
    - Encoding categorical variables
 
 2. Class Imbalance Handling
-   - SMOTE (Synthetic Minority Oversampling Technique)
+   - SMOTEENN (Synthetic Minority Over-sampling Technique and Edited Nearest Neighbours)
 
 3. Data Splitting
    - Train/Test split (80/20)
 
 4. Model Training
-   - Random Forest Classifier
+   - Gradient Boosting Classifier (selected via multi-algorithm comparison)
    - Hyperparameter tuning using RandomizedSearchCV
 
 5. Model Evaluation
@@ -135,9 +143,21 @@ The application is deployed using GitHub and Streamlit Community Cloud.
 
 ## Results
 
-- Balanced Accuracy achieved: ~0.61
-- Model successfully predicts CKD outcomes
-- SHAP explains biomarker contributions
+We evaluated 6 different machine learning models on the 14-feature clinical dataset. **Gradient Boosting** was selected as the final model due to its superior Balanced Accuracy and 100% ESRD recall capabilities.
+
+| Algorithm | Balanced Accuracy | Overall Accuracy | Death/Progression Recall | ESRD Recall |
+|---|---|---|---|---|
+| **Gradient Boosting** | **0.6708** | 0.6563 | 0.2653 | **1.0000** |
+| XGBoost | 0.6537 | 0.6794 | 0.2015 | 0.9667 |
+| Logistic Regression | 0.6523 | 0.5611 | **0.3520** | **1.0000** |
+| Random Forest *(baseline)* | 0.6480 | 0.6403 | 0.2449 | 0.9667 |
+| SVM (RBF) | 0.6414 | 0.5716 | 0.2908 | **1.0000** |
+| LightGBM | 0.6398 | **0.7009** | 0.1531 | 0.9333 |
+
+*After adding 4 engineered features (BUN/Cr Ratio, Ca-P Product, etc.), the final Gradient Boosting model metrics are:*
+- Balanced Accuracy achieved: ~0.65 (64.71%)
+- Model successfully predicts CKD progressive outcomes emphasizing high-risk recall (Death/Progression Recall: 0.26)
+- SHAP explains clinical biomarker contributions and engineered feature impacts
 
 ---
 

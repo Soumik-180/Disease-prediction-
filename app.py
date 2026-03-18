@@ -1,5 +1,8 @@
 import streamlit as st
 st.set_page_config(layout="wide")
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 import pandas as pd
 import joblib
 
@@ -63,10 +66,12 @@ with left_col:
         sex = st.selectbox("Sex", ["Female", "Male"])
         bmi = st.number_input("BMI", 10.0, 50.0, 25.0)
 
-        hypertension = st.selectbox("Hypertension", ["No", "Yes"])
         diabetes = st.selectbox("Diabetes", ["No", "Yes"])
         hiv = st.selectbox("HIV Positive", ["No", "Yes"])
-        glomerulonephritis = st.selectbox("Glomerulonephritis", ["No", "Yes"])
+        
+        bun = st.number_input("BUN (mg/dL)", 0.0, 100.0, 20.0)
+        hba1c = st.number_input("HbA1c (%)", 3.0, 15.0, 5.5)
+        systolic = st.number_input("Systolic BP", 80, 250, 120)
 
     with col2:
         egfr = st.number_input("eGFR", 0.0, 200.0, 90.0)
@@ -77,18 +82,12 @@ with left_col:
         potassium = st.number_input("Potassium (mEq/L)", 2.0, 7.0, 4.5)
         phosphate = st.number_input("Phosphate (mg/dL)", 1.0, 10.0, 4.0)
         calcium = st.number_input("Calcium (mg/dL)", 5.0, 12.0, 9.0)
-
-    bun = st.number_input("BUN (mg/dL)", 0.0, 100.0, 20.0)
-    systolic = st.number_input("Systolic BP", 80, 250, 120)
-    diastolic = st.number_input("Diastolic BP", 40, 150, 80)
-    hba1c = st.number_input("HbA1c (%)", 3.0, 15.0, 5.5)
+        diastolic = st.number_input("Diastolic BP", 40, 150, 80)
 
 # Convert categorical inputs
 sex = 1 if sex == "Male" else 0
-hypertension = 1 if hypertension == "Yes" else 0
 diabetes = 1 if diabetes == "Yes" else 0
 hiv = 1 if hiv == "Yes" else 0
-glomerulonephritis = 1 if glomerulonephritis == "Yes" else 0
 
 with left_col:
     st.divider()
@@ -98,26 +97,25 @@ if predict_button:
     # Input validation
     if diastolic >= systolic:
         st.warning("⚠️ Diastolic BP is greater than or equal to Systolic BP. Please verify your input.")
+
     try:
 
         with left_col:
             st.subheader("Patient Summary")
 
             summary_df = pd.DataFrame({
-                "Input": [
-                    "Age", "Sex", "BMI", "Hypertension", "Diabetes",
-                    "HIV", "Glomerulonephritis", "eGFR", "Creatinine",
-                    "UACR", "Hemoglobin", "Potassium", "Phosphate",
-                    "Calcium", "BUN", "Systolic BP", "Diastolic BP", "HbA1c"
+                "Feature": [
+                    "Age", "Sex", "BMI", "Diabetes", "HIV Positive", 
+                    "eGFR", "Creatinine", "UACR", "Hemoglobin", 
+                    "Potassium", "Phosphate", "Calcium", "BUN", 
+                    "Systolic BP", "Diastolic BP", "HbA1c"
                 ],
                 "Value": [
                     str(age),
                     "Male" if sex == 1 else "Female",
                     str(bmi),
-                    "Yes" if hypertension == 1 else "No",
                     "Yes" if diabetes == 1 else "No",
                     "Yes" if hiv == 1 else "No",
-                    "Yes" if glomerulonephritis == 1 else "No",
                     str(egfr),
                     str(creatinine),
                     str(uacr),
@@ -219,88 +217,148 @@ if predict_button:
 
             st.plotly_chart(gauge, width='stretch', config={"displayModeBar": False})
 
-            # Risk interpretation
-            if risk_score < 0.3:
-                st.success("🟢 Low CKD Progression / Mortality Risk")
-            elif risk_score < 0.6:
-                st.warning("🟡 Moderate CKD Progression / Mortality Risk")
+            # Risk interpretation based on model prediction
+            if prediction[0] == 0:
+                st.success("🟢 Low Risk: Model predicts Stable CKD")
+            elif prediction[0] == 1:
+                st.warning("🟡 High Risk: Model predicts CKD Progression / Mortality")
             else:
-                st.error("🔴 High CKD Progression / Mortality Risk")
+                st.error("🔴 Severe Risk: Model predicts End-Stage Renal Disease (ESRD)")
 
             st.subheader("Clinical Explanation")
 
-            # Compute SHAP values for this patient
-            try:
-                explainer = shap.TreeExplainer(model)
-                shap_values = explainer.shap_values(patient_data)
-            except Exception:
-                # GBM multi-class fallback: use feature importance as proxy
-                importances = model.feature_importances_
-                shap_values = None
+            # --- 1. Compute True Local SHAP Values ---
+            with st.spinner("Analyzing personalized biomarker impacts..."):
+                try:
+                    # Load a small background dataset to serve as the baseline for SHAP
+                    from config import CLEANED_DATA_PATH
+                    df_bg = pd.read_csv(CLEANED_DATA_PATH)
+                    target_col = 'outcome' if 'outcome' in df_bg.columns else df_bg.columns[-1]
+                    X_bg = df_bg.drop(columns=[target_col], errors='ignore')
+                    
+                    # Apply the same feature engineering to the background
+                    from src.feature_engineering import engineer_features
+                    # Drop the 4 culled features from background just like we did for training
+                    features_to_drop = ['hypertension', 'glomerulonephritis', 'bmi', 'diastolic_bp']
+                    X_bg = X_bg.drop(columns=features_to_drop, errors='ignore')
+                    X_bg = engineer_features(X_bg).sample(n=50, random_state=42)
+                    
+                    predicted_class = prediction[0]
+                    
+                    # We explain the predicted class probability
+                    predict_fn = lambda x: model.predict_proba(x)[:, predicted_class]
+                    explainer = shap.Explainer(predict_fn, X_bg)
+                    shap_obj = explainer(patient_data)
+                    
+                    shap_values_class = shap_obj.values[0]
+                    
+                    # Reconstruct shap_df for the legacy bar chart if needed, though we will use waterfall
+                    shap_df = pd.DataFrame({
+                        "Feature": list(patient_data.columns),
+                        "SHAP Value": list(shap_values_class)
+                    }).sort_values(by="SHAP Value", key=abs, ascending=False)
+                    
+                except Exception as e:
+                    st.error(f"SHAP Error: {e}")
+                    # GBM/Pipeline multi-class fallback: use feature importance as proxy
+                    try:
+                        importances = model.named_steps['gb'].feature_importances_
+                    except AttributeError:
+                        importances = getattr(model, "feature_importances_", np.zeros(len(patient_data.columns)))
+                    
+                    shap_values_class = importances
+                    # Ensure numpy 1D array
+                    shap_values_class = np.array(shap_values_class).reshape(-1)
+                    
+                    if len(shap_values_class) != len(patient_data.columns):
+                        shap_values_class = np.zeros(len(patient_data.columns))
+                    
+                    shap_df = pd.DataFrame({
+                        "Feature": list(patient_data.columns),
+                        "SHAP Value": list(shap_values_class)
+                    }).sort_values(by="SHAP Value", key=abs, ascending=False)
+                    
+                    shap_obj = None
 
-            predicted_class = prediction[0]
-
-            # Extract SHAP values for the predicted class and the single patient row
-            if shap_values is not None:
-                if isinstance(shap_values, list):
-                    shap_values_class = shap_values[predicted_class][0]
-                else:
-                    shap_values_class = shap_values[0]
+            # --- 2. SHAP Waterfall Visualization ---
+            if shap_obj is not None:
+                fig, ax = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
+                ax.set_facecolor('#0e1117')
+                
+                # Plotly/Matplotlib styling for dark mode
+                plt.rcParams.update({
+                    "figure.facecolor": "#0e1117",
+                    "axes.facecolor": "#0e1117",
+                    "axes.edgecolor": "white",
+                    "axes.labelcolor": "white",
+                    "text.color": "white",
+                    "xtick.color": "white",
+                    "ytick.color": "white"
+                })
+                
+                shap.plots.waterfall(shap_obj[0], show=False)
+                
+                # Force white text for standard SHAP plots which often override rcParams
+                import matplotlib.text as mtext
+                for ax_obj in fig.axes:
+                    ax_obj.tick_params(colors="white")
+                    ax_obj.xaxis.label.set_color("white")
+                    ax_obj.yaxis.label.set_color("white")
+                
+                # Safely change all Text elements (labels, values, ticks) to white
+                for text_obj in fig.findobj(match=mtext.Text):
+                    text_obj.set_color("white")
+                        
+                st.pyplot(fig, transparent=True)
             else:
-                # Use feature importance as a SHAP proxy
-                shap_values_class = importances
+                st.warning("Could not generate SHAP Waterfall plot. Using fallback feature importances.")
 
-            # Ensure numpy 1D array
-            shap_values_class = np.array(shap_values_class).reshape(-1)
+            # --- 3. Enhanced Clinical Explanations ---
+            st.markdown("### 🧬 Personalized Clinical Insights")
+            
+            clinical_context = {
+                "bun_creatinine_ratio": "Elevated BUN/Cr ratios suggest dehydration or decreased kidney blood flow (pre-renal state), which acts as a major stressor on kidney function.",
+                "calcium_phosphate_product": "High Ca-P product increases the risk of vascular calcification and cardiovascular events, which are highly correlated with progressive CKD.",
+                "renal_risk_score": "This composite score aggregates age, blood pressure, and key kidney markers to estimate overall physiological stress.",
+                "uacr_log": "Log UACR normalizes extreme proteinuria values. High proteinuria is one of the strongest predictors of rapid kidney function decline.",
+                "egfr": "Estimated Glomerular Filtration Rate directly measures kidney filtration capacity. Lower values mean worse kidney function.",
+                "serum_creatinine_mgdl": "Creatinine is a waste product. Elevated levels indicate the kidneys are currently failing to filter waste from the blood.",
+                "age_years": "Older age naturally correlates with reduced kidney function elasticity and higher susceptibility to progression.",
+                "hemoglobin_gdl": "Low hemoglobin (anemia) is a common complication of advanced CKD due to decreased erythropoietin production in the kidneys.",
+                "systolic_bp": "High blood pressure accelerates kidney damage by stressing the delicate filtration blood vessels (glomeruli).",
+                "diabetes": "Diabetes is a leading cause of CKD, causing diabetic nephropathy and structural kidney damage over time.",
+                "potassium_meql": "Failing kidneys cannot excrete potassium properly, leading to life-threatening hyperkalemia.",
+                "phosphate_mgdl": "High phosphate levels occur in advanced CKD and can cause severe bone and heart problems.",
+                "calcium_mgdl": "Abnormal calcium levels are linked to CKD mineral and bone disorder.",
+                "bun_mgdl": "Blood Urea Nitrogen buildup indicates poor waste filtration by the kidneys.",
+                "hba1c_pct": "High HbA1c indicates poor long-term blood sugar control, accelerating diabetic kidney damage.",
+                "sex": "Biological sex can influence CKD progression rates and baseline creatinine distribution.",
+                "hiv_positive": "HIV infection or its treatments can cause HIV-associated nephropathy (HIVAN), increasing CKD risk."
+            }
 
-            # Force SHAP length to match number of features
-            n_features = len(patient_data.columns)
-            if len(shap_values_class) != n_features:
-                shap_values_class = shap_values_class[:n_features]
+            top_factors = shap_df.head(4)  # Show top 4 drivers
 
-            # Create SHAP importance dataframe safely
-            shap_df = pd.DataFrame({
-                "Feature": list(patient_data.columns),
-                "SHAP Value": list(shap_values_class)
-            })
-
-            shap_df = shap_df.sort_values(by="SHAP Value", key=abs, ascending=False).head(10)
-
-            fig, ax = plt.subplots(facecolor='#0e1117')
-            ax.set_facecolor('#0e1117')
-
-            # Color bars: red = increases risk, green = protective
-            colors = ["#e74c3c" if v > 0 else "#2ecc71" for v in shap_df["SHAP Value"]]
-
-            ax.barh(shap_df["Feature"], shap_df["SHAP Value"], color=colors)
-            ax.set_xlabel("Impact on Prediction")
-            ax.set_title("Top Biomarkers Influencing This Prediction")
-            ax.invert_yaxis()
-            ax.tick_params(colors='white')
-            ax.xaxis.label.set_color('white')
-            ax.title.set_color('white')
-            for spine in ax.spines.values():
-                spine.set_visible(False)
-
-            st.pyplot(fig)
-
-            # --- Clinical Explanation Panel ---
-            st.markdown("### Key Factors Driving This Prediction")
-
-            top_factors = shap_df.head(5)
-
-            explanation_lines = []
             for _, row in top_factors.iterrows():
-                feature = row["Feature"].replace("_", " ").title()
+                feat_name = row["Feature"]
                 impact = row["SHAP Value"]
-
+                
+                # Format the feature name for reading
+                clean_name = feat_name.replace("_", " ").title()
+                
+                # Get the actual patient value for context
+                val = patient_data[feat_name].iloc[0]
+                if isinstance(val, float):
+                    val = round(val, 2)
+                
+                # Context message
+                context_msg = clinical_context.get(feat_name, "Significant contributing biomarker.")
+                
                 if impact > 0:
-                    explanation_lines.append(f"• **{feature}** increased the predicted risk")
+                    st.error(f"📈 **Elevated Risk from {clean_name} (Value: {val})**")
+                    st.caption(f"{context_msg}")
                 else:
-                    explanation_lines.append(f"• **{feature}** reduced the predicted risk")
-
-            for line in explanation_lines:
-                st.markdown(line)
+                    st.success(f"📉 **Protective/Stable Factor: {clean_name} (Value: {val})**")
+                    st.caption(f"{context_msg}")
 
     except Exception as e:
         st.error(f"❌ Prediction failed: {e}")
