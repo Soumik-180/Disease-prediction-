@@ -132,6 +132,7 @@ if predict_button:
 
             st.dataframe(summary_df, width='stretch', hide_index=True)
 
+
         patient_data = pd.DataFrame([{
             "age_years": age,
             "sex": sex,
@@ -146,8 +147,17 @@ if predict_button:
             "calcium_mgdl": calcium,
             "bun_mgdl": bun,
             "systolic_bp": systolic,
-            "hba1c_pct": hba1c
+            "hba1c_pct": hba1c,
+            # Add these if you ever collect them in the UI, else will be dropped below
+            "bmi": bmi,
+            "diastolic_bp": diastolic,
+            # "hypertension": 0,  # Uncomment if you add to UI
+            # "glomerulonephritis": 0,  # Uncomment if you add to UI
         }])
+
+        # Drop the same features as in training before feature engineering
+        features_to_drop = ['hypertension', 'glomerulonephritis', 'bmi', 'diastolic_bp']
+        patient_data = patient_data.drop(columns=features_to_drop, errors='ignore')
 
         # Apply feature engineering to match the model's training features
         from src.feature_engineering import engineer_features
