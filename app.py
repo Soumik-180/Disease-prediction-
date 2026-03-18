@@ -12,8 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
-# Load trained model (cached to avoid reloading on every interaction)
-@st.cache_resource
+# Load trained model (no caching to ensure latest version is used)
 def load_model():
     try:
         return joblib.load("models/random_forest_best_model.pkl")
