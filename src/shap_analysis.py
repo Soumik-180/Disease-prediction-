@@ -25,13 +25,23 @@ def run_shap_analysis():
     print("Test dataset loaded")
 
     # Use a subset for faster SHAP computation
-    X_sample = X_test.sample(n=min(1000, len(X_test)), random_state=42)
+    X_sample = X_test.sample(n=min(100, len(X_test)), random_state=42)
+    
+    features_to_drop = ['hypertension', 'glomerulonephritis', 'bmi', 'diastolic_bp']
+    X_sample = X_sample.drop(columns=features_to_drop, errors='ignore')
 
-    # Create SHAP explainer
-    explainer = shap.TreeExplainer(model)
+    # Apply feature engineering to match the model's training features
+    from src.feature_engineering import engineer_features
+    X_sample = engineer_features(X_sample)
 
-    # Compute SHAP values
-    shap_values = explainer.shap_values(X_sample)
+    # Create SHAP explainer — use TreeExplainer if supported, else fall back
+    try:
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_sample, check_additivity=False)
+    except Exception as e:
+        print(f"TreeExplainer not supported ({e}), using Explainer fallback...")
+        explainer = shap.Explainer(model.predict, X_sample)
+        shap_values = explainer(X_sample).values
 
     print("SHAP values computed")
 

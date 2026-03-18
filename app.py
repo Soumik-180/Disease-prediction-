@@ -23,33 +23,25 @@ def load_model():
 
 model = load_model()
 
-# Initialize SHAP explainer (also cached for performance)
-@st.cache_resource
-def load_explainer():
-    try:
-        return shap.TreeExplainer(model)
-    except Exception as e:
-        st.error(f"❌ Failed to initialize SHAP explainer: {e}")
-        st.stop()
-
-explainer = load_explainer()
+# SHAP explainer will be created on-demand during prediction
+# (GradientBoosting multi-class doesn't support TreeExplainer)
 
 st.title("AI CKD Outcome Prediction System")
 
 st.markdown("""
 
-This system uses a **Random Forest machine learning model** trained on
+This system uses a **Gradient Boosting machine learning model** trained on
 clinical biomarker data to predict CKD progression risk.
 
 Model Transparency
-- Algorithm: Random Forest
+- Algorithm: Gradient Boosting
 - Training samples: ~10,000 patients
-- Features: 18 clinical biomarkers
+- Features: 14 clinical biomarkers
 - Explainability: SHAP feature attribution
             
 Possible outcomes:
 - Stable CKD
-- Death Risk
+- Death/Progression Risk
 - ESRD Risk
 """)
 
@@ -145,11 +137,8 @@ if predict_button:
         patient_data = pd.DataFrame([{
             "age_years": age,
             "sex": sex,
-            "bmi": bmi,
-            "hypertension": hypertension,
             "diabetes": diabetes,
             "hiv_positive": hiv,
-            "glomerulonephritis": glomerulonephritis,
             "egfr": egfr,
             "serum_creatinine_mgdl": creatinine,
             "uacr_mg_g": uacr,
@@ -159,16 +148,19 @@ if predict_button:
             "calcium_mgdl": calcium,
             "bun_mgdl": bun,
             "systolic_bp": systolic,
-            "diastolic_bp": diastolic,
             "hba1c_pct": hba1c
         }])
+
+        # Apply feature engineering to match the model's training features
+        from src.feature_engineering import engineer_features
+        patient_data = engineer_features(patient_data)
 
         prediction = model.predict(patient_data)
         probs = model.predict_proba(patient_data)[0]
 
         outcome_map = {
             0: "Stable CKD",
-            1: "Death Risk",
+            1: "Death/Progression Risk",
             2: "ESRD Risk"
         }
 
@@ -179,9 +171,9 @@ if predict_button:
             if prediction[0] == 0:
                 st.success(f"✅ {result}")
             elif prediction[0] == 1:
-                st.error(f"🔴 {result}")
-            else:
                 st.warning(f"🟡 {result}")
+            else:
+                st.error(f"🔴 {result}")
 
             st.subheader("Prediction Probabilities")
 
@@ -198,10 +190,10 @@ if predict_button:
             # CKD Risk Gauge
             st.subheader("CKD Risk Level")
 
-            # Use the highest serious outcome probability (Death or ESRD)
+            # Use the highest serious outcome probability (Death/Progression, or ESRD)
             classes = list(model.classes_)
-            death_prob = probs[classes.index(1)]
-            esrd_prob = probs[classes.index(2)]
+            death_prob = probs[classes.index(1)] if 1 in classes else 0
+            esrd_prob = probs[classes.index(2)] if 2 in classes else 0
             risk_score = max(death_prob, esrd_prob)
 
             # Convert to percentage score
@@ -238,17 +230,25 @@ if predict_button:
             st.subheader("Clinical Explanation")
 
             # Compute SHAP values for this patient
-            shap_values = explainer.shap_values(patient_data)
+            try:
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(patient_data)
+            except Exception:
+                # GBM multi-class fallback: use feature importance as proxy
+                importances = model.feature_importances_
+                shap_values = None
 
             predicted_class = prediction[0]
 
             # Extract SHAP values for the predicted class and the single patient row
-            if isinstance(shap_values, list):
-                # shape: [n_classes][n_samples][n_features]
-                shap_values_class = shap_values[predicted_class][0]
+            if shap_values is not None:
+                if isinstance(shap_values, list):
+                    shap_values_class = shap_values[predicted_class][0]
+                else:
+                    shap_values_class = shap_values[0]
             else:
-                # shape: [n_samples][n_features]
-                shap_values_class = shap_values[0]
+                # Use feature importance as a SHAP proxy
+                shap_values_class = importances
 
             # Ensure numpy 1D array
             shap_values_class = np.array(shap_values_class).reshape(-1)

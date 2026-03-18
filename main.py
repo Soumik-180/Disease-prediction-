@@ -7,6 +7,7 @@ from src.data_split import split_dataset
 from src.train_model import perform_training
 from src.evaluate_model import evaluate_and_plot
 from src.feature_importance import analyze_feature_importance
+from src.feature_engineering import engineer_features
 from src.shap_analysis import run_shap_analysis
 
 
@@ -48,29 +49,35 @@ def main():
     y_train = pd.read_csv(f'{split_dir}/y_train.csv').squeeze()
     y_test = pd.read_csv(f'{split_dir}/y_test.csv').squeeze()
 
-    # Step 4 — Train model (returns imblearn Pipeline with SMOTE + RF)
+    # Step 4 — Train model (returns imblearn Pipeline with SMOTEENN + Gradient Boosting)
     best_pipeline = perform_training(X_train, X_test, y_train, y_test)
 
-    # Extract the trained RF model from the pipeline
+    # Re-apply culling + feature engineering so downstream steps match the model's input
+    features_to_drop = ['hypertension', 'glomerulonephritis', 'bmi', 'diastolic_bp']
+    X_train_culled = engineer_features(X_train.drop(columns=features_to_drop, errors='ignore'))
+    X_test_culled = engineer_features(X_test.drop(columns=features_to_drop, errors='ignore'))
+
+    # Extract the trained Gradient Boosting model from the pipeline
     # (needed for feature importance and saving a clean model for app.py)
-    best_model = best_pipeline.named_steps['rf']
+    best_model = best_pipeline.named_steps['gb']
 
     # Step 5 — Evaluate model (pipeline handles prediction correctly)
-    evaluate_and_plot(best_pipeline, X_test, y_test, figures_dir=figures_dir)
+    evaluate_and_plot(best_pipeline, X_test_culled, y_test, figures_dir=figures_dir)
 
     # Step 6 — Feature importance (uses the raw RF model)
     analyze_feature_importance(
         best_model,
-        feature_names=X_train.columns,
+        feature_names=X_train_culled.columns,
         results_dir=results_dir,
         figures_dir=figures_dir
     )
 
-    # Step 8 — SHAP explainability analysis
-    run_shap_analysis()
-
-    # Step 9 — Save the RF model (not the full pipeline, for app.py compatibility)
+    # Step 8 — Save the GB model (not the full pipeline, for app.py compatibility)
     joblib.dump(best_model, MODEL_PATH)
+
+    # Step 9 — SHAP explainability analysis
+    # (Must run after saving because run_shap_analysis loads from MODEL_PATH)
+    run_shap_analysis()
 
     print("\nPipeline Execution Successful")
 

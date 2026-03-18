@@ -23,11 +23,11 @@ def evaluate_and_plot(model, X_test: pd.DataFrame, y_test: pd.Series, figures_di
     bal_acc = balanced_accuracy_score(y_test, y_pred)
     print(f"Balanced Accuracy: {bal_acc:.4f}")
     print("\nClassification Report:")
-    print(classification_report(y_test, y_pred, labels=[0,1,2], target_names=["Stable CKD", "Death", "ESRD"]))
+    print(classification_report(y_test, y_pred, labels=[0,1,2], target_names=["Stable CKD", "Death/Progression", "ESRD"]))
     
     # 1. Create Confusion Matrix
     cm = confusion_matrix(y_test, y_pred, labels=[0,1,2])
-    class_labels = ["Stable CKD", "Death", "ESRD"]
+    class_labels = ["Stable CKD", "Death/Progression", "ESRD"]
     
     # 2. Plotting (Publication Quality)
     plt.figure(figsize=(10, 8))

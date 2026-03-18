@@ -35,14 +35,9 @@ def split_dataset():
     df = pd.read_csv(INPUT_PATH)
 
     # --- Apply outcome class merging to match training pipeline ---
+    # --- Target class labels are merged to 3 classes ---
     # Original labels: 0=Stable, 1=Progression, 2=Death, 3=ESRD
-    # New labels: 0=Stable, 1=Death (Progression+Death), 2=ESRD
-    df["outcome"] = df["outcome"].map({
-        0: 0,
-        1: 1,
-        2: 1,
-        3: 2
-    }).astype(int)
+    df["outcome"] = df["outcome"].astype(int).map({0: 0, 1: 1, 2: 1, 3: 2})
 
     print("Dataset shape:", df.shape)
     print("Columns:", list(df.columns))
