@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 # Load trained model (no caching to ensure latest version is used)
 def load_model():
     try:
-        return joblib.load("models/random_forest_best_model.pkl")
+        return joblib.load("models/gradient_boosting_best_model.pkl")
     except FileNotFoundError:
         st.error("❌ Model file not found. Please run `python main.py` to train the model first.")
         st.stop()

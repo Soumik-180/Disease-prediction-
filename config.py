@@ -16,7 +16,7 @@ SPLIT_DIR = 'Data/Split'
 GRAPH_DIR = 'Graph'
 
 # Trained model
-MODEL_PATH = 'models/random_forest_best_model.pkl'
+MODEL_PATH = 'models/gradient_boosting_best_model.pkl'
 
 # Output directories
 MODELS_DIR = 'models'
